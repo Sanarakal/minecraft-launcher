@@ -4,6 +4,8 @@ import html2canvas from 'html2canvas';
 import './App.css';
 
 const API = 'http://89.104.67.130:4000';
+// Путь к изображению, на которое будут «перевёрнуты» кубики
+const TARGET_IMG = 'assets/flip-target.png';
 
 export default function App() {
   const [username, setUsername] = useState('');
@@ -55,6 +57,19 @@ export default function App() {
     const cellH = height / ROWS;
     const ctx = canvas.getContext('2d')!;
 
+    // Подготовка изображения назначения
+    const targetImg = await new Promise<HTMLImageElement>((res, rej) => {
+      const img = new Image();
+      img.src = TARGET_IMG;
+      img.onload = () => res(img);
+      img.onerror = rej;
+    });
+    const targetCanvas = document.createElement('canvas');
+    targetCanvas.width = width;
+    targetCanvas.height = height;
+    const tCtx = targetCanvas.getContext('2d')!;
+    tCtx.drawImage(targetImg, 0, 0, width, height);
+
     // Случайный порядок индексов
     const order = Array.from({ length: TOTAL }, (_, i) => i).sort(
       () => Math.random() - 0.5
@@ -64,12 +79,20 @@ export default function App() {
     const newPieces: React.ReactElement[] = order.map((idx, n) => {
       const r = Math.floor(idx / COLS);
       const c = idx % COLS;
-      const slice = ctx.getImageData(c * cellW, r * cellH, cellW, cellH);
-      const pieceCanvas = document.createElement('canvas');
-      pieceCanvas.width = cellW;
-      pieceCanvas.height = cellH;
-      pieceCanvas.getContext('2d')!.putImageData(slice, 0, 0);
-      const url = pieceCanvas.toDataURL();
+
+      const frontSlice = ctx.getImageData(c * cellW, r * cellH, cellW, cellH);
+      const frontCanvas = document.createElement('canvas');
+      frontCanvas.width = cellW;
+      frontCanvas.height = cellH;
+      frontCanvas.getContext('2d')!.putImageData(frontSlice, 0, 0);
+      const frontUrl = frontCanvas.toDataURL();
+
+      const backSlice = tCtx.getImageData(c * cellW, r * cellH, cellW, cellH);
+      const backCanvas = document.createElement('canvas');
+      backCanvas.width = cellW;
+      backCanvas.height = cellH;
+      backCanvas.getContext('2d')!.putImageData(backSlice, 0, 0);
+      const backUrl = backCanvas.toDataURL();
 
       return (
         <div
@@ -80,11 +103,13 @@ export default function App() {
             height: cellH,
             left:   c * cellW,
             top:    r * cellH,
-            backgroundImage: `url(${url})`,
             animationDelay:    `${n * DELAY}ms`,
             animationDuration: `${DURA}ms`,
           }}
-        />
+        >
+          <div className="face front" style={{ backgroundImage: `url(${frontUrl})` }} />
+          <div className="face back"  style={{ backgroundImage: `url(${backUrl})` }} />
+        </div>
       );
     });
 
